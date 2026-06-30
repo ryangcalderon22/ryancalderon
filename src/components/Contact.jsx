@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { FadeIn } from './FadeIn'
 
 export default function Contact() {
-  const [form, setForm] = useState({ name: '', email: '', service: '', message: '' })
+  const [form, setForm] = useState({ name: '', email: '', service: '', message: '', _honey: '' })
   const [sent, setSent] = useState(false)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -10,12 +10,23 @@ export default function Contact() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError(null)
+
+    // Honeypot: if this hidden field is filled, it's a bot
+    if (form._honey) return
+
+    // Basic validation
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)
+    if (!emailOk) { setError('Please enter a valid email address.'); return }
+    if (form.name.trim().length < 2) { setError('Please enter your name.'); return }
+    if (form.message.trim().length < 10) { setError('Message is too short.'); return }
+
     setLoading(true)
     try {
+      const { _honey, ...payload } = form
       const res = await fetch('https://formspree.io/f/mjgqvggw', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       })
       if (res.ok) {
         setSent(true)
@@ -58,7 +69,17 @@ export default function Contact() {
         </FadeIn>
 
         <FadeIn direction="left" delay={150}>
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
+            {/* Honeypot — hidden from humans, bots fill it and get silently blocked */}
+            <input
+              type="text"
+              name="_honey"
+              value={form._honey}
+              onChange={e => setForm({ ...form, _honey: e.target.value })}
+              style={{ display: 'none' }}
+              tabIndex={-1}
+              autoComplete="off"
+            />
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label">Name</label>
@@ -68,6 +89,7 @@ export default function Contact() {
                   placeholder="Your name"
                   value={form.name}
                   onChange={e => setForm({ ...form, name: e.target.value })}
+                  maxLength={100}
                   required
                 />
               </div>
@@ -79,6 +101,7 @@ export default function Contact() {
                   placeholder="your@email.com"
                   value={form.email}
                   onChange={e => setForm({ ...form, email: e.target.value })}
+                  maxLength={200}
                   required
                 />
               </div>
@@ -91,6 +114,7 @@ export default function Contact() {
                 placeholder="Frontend / WordPress / Web Builder / E-commerce"
                 value={form.service}
                 onChange={e => setForm({ ...form, service: e.target.value })}
+                maxLength={200}
               />
             </div>
             <div className="form-group">
@@ -101,6 +125,7 @@ export default function Contact() {
                 placeholder="Tell me about your project..."
                 value={form.message}
                 onChange={e => setForm({ ...form, message: e.target.value })}
+                maxLength={2000}
                 required
               />
             </div>
