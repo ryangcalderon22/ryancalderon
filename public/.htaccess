@@ -1,10 +1,78 @@
+# ── SPA Routing ─────────────────────────────────────────────────────────────
 Options -MultiViews
 RewriteEngine On
 RewriteBase /
 
-# Serve existing files and directories directly
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-
-# Route everything else to index.html for the SPA
 RewriteRule ^ index.html [L]
+
+# ── Force HTTPS ──────────────────────────────────────────────────────────────
+RewriteCond %{HTTPS} off
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+# ── Disable directory listing ────────────────────────────────────────────────
+Options -Indexes
+
+# ── Block access to sensitive files ─────────────────────────────────────────
+<FilesMatch "(\.env|\.git|\.htpasswd|composer\.(json|lock)|package(-lock)?\.json|webpack\.config\.js)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# ── Security Headers ─────────────────────────────────────────────────────────
+<IfModule mod_headers.c>
+    # Prevent clickjacking
+    Header always set X-Frame-Options "SAMEORIGIN"
+
+    # Prevent MIME-type sniffing
+    Header always set X-Content-Type-Options "nosniff"
+
+    # Enable XSS protection in older browsers
+    Header always set X-XSS-Protection "1; mode=block"
+
+    # Control referrer information
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+    # HTTP Strict Transport Security (force HTTPS for 1 year)
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+    # Permissions Policy (disable unused browser features)
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+
+    # Content Security Policy
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://formspree.io; frame-ancestors 'none';"
+
+    # Remove server signature
+    Header always unset X-Powered-By
+    Header always unset Server
+</IfModule>
+
+# ── Block bad bots and scanners ──────────────────────────────────────────────
+<IfModule mod_rewrite.c>
+    RewriteCond %{HTTP_USER_AGENT} (acunetix|nikto|sqlmap|nmap|masscan|zgrab) [NC]
+    RewriteRule .* - [F,L]
+</IfModule>
+
+# ── Protect against common exploits ─────────────────────────────────────────
+<IfModule mod_rewrite.c>
+    # Block null bytes
+    RewriteCond %{QUERY_STRING} (\%00|%00) [NC]
+    RewriteRule .* - [F,L]
+
+    # Block script injection attempts
+    RewriteCond %{QUERY_STRING} (<|%3C).*script.*(>|%3E) [NC]
+    RewriteRule .* - [F,L]
+</IfModule>
+
+# ── Cache static assets ──────────────────────────────────────────────────────
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/html "access plus 0 seconds"
+    ExpiresByType text/css "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+    ExpiresByType application/pdf "access plus 1 month"
+</IfModule>
